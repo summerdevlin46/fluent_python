@@ -1,0 +1,60 @@
+# 🐍 Fluent Python — Notes & Practice
+
+Personal notes and practice notebooks while working through [*Fluent Python*]([https://www.oreilly.com/library/view/fluent-python-2nd/9781492056348/](https://elmoukrie.com/wp-content/uploads/2022/05/luciano-ramalho-fluent-python_-clear-concise-and-effective-programming-oreilly-media-2022.pdf)) by Luciano Ramalho. This repo tracks my progress as I review Python best practices and idiomatic patterns.
+
+---
+
+## 📖 About the Book
+
+*Fluent Python* covers how to write effective, idiomatic Python by diving deep into the language's core features — data models, sequences, functions as objects, object-oriented idioms, and concurrency.
+
+---
+
+## 🗂️ Structure
+
+```
+fluent-python/
+├── notes/          # Chapter summaries and key takeaways
+├── notebooks/      # Jupyter notebooks with practice code
+└── README.md
+```
+
+> Structure may evolve as I progress through the book.
+
+---
+
+## 📚 Progress
+
+| Part | Title | Status |
+|------|-------|--------|
+| Part I | Data Structures | 🔄 In progress |
+| Part II | Functions as Objects | ⬜ Not started |
+| Part III | Classes and Protocols | ⬜ Not started |
+| Part IV | Control Flow | ⬜ Not started |
+| Part V | Metaprogramming | ⬜ Not started |
+
+**Legend:** ✅ Done · 🔄 In progress · ⬜ Not started
+
+---
+
+## 🎯 Goals
+
+- Understand idiomatic Python and how to write "Pythonic" code
+- Build intuition for Python's data model
+- Take clear notes I can reference later
+- Practice concepts hands-on through notebooks
+
+---
+
+## 🛠️ Setup
+
+```bash
+git clone https://github.com/summerdevlin46/fluent_python.git
+cd fluent python
+```
+
+---
+
+## 📝 Notes
+
+These are personal learning notes — not comprehensive summaries. If you're also reading the book, feel free to browse for reference, but I'd recommend taking your own notes alongside!
