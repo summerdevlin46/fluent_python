@@ -1,0 +1,127 @@
+# Chapter 1 — The Python Data Model
+
+> **Core idea:** The Python Data Model is the API that makes your objects behave like built-in types. It's the backbone of what makes code feel "Pythonic."
+
+---
+
+## What is the Python Data Model?
+
+The data model describes how Python objects interact with core language features like `len()`, iteration, indexing, `in` checks, string representation, and arithmetic operators. By implementing **special (dunder) methods**, your custom classes plug directly into these features.
+
+---
+
+## Special Methods (Dunder Methods)
+
+Special methods are surrounded by double underscores: `__len__`, `__getitem__`, `__repr__`, etc. They are **not called directly by you** — they are invoked by the Python interpreter in response to built-in operations.
+
+```python
+len(my_object)       # calls my_object.__len__()
+my_object[0]         # calls my_object.__getitem__(0)
+repr(my_object)      # calls my_object.__repr__()
+```
+
+> You write the methods; Python decides when to call them.
+
+---
+
+## The FrenchDeck Example
+
+The chapter walks through a `FrenchDeck` class that implements just two special methods — `__len__` and `__getitem__` — and immediately gets for free:
+
+- `len(deck)` — length
+- `deck[0]`, `deck[-1]` — indexing
+- `random.choice(deck)` — random selection
+- `for card in deck` — iteration
+- `card in deck` — membership testing
+- `sorted(deck, key=...)` — sorting
+
+**The lesson:** implement a small, well-chosen set of special methods and Python's standard library works for you automatically.
+
+```python
+import collections
+
+Card = collections.namedtuple('Card', ['rank', 'suit'])
+
+class FrenchDeck:
+    ranks = [str(n) for n in range(2, 11)] + list('JQKA')
+    suits = 'spades diamonds clubs hearts'.split()
+
+    def __init__(self):
+        self._cards = [Card(rank, suit) for suit in self.suits
+                                        for rank in self.ranks]
+
+    def __len__(self):
+        return len(self._cards)
+
+    def __getitem__(self, position):
+        return self._cards[position]
+```
+
+---
+
+## Emulating Numeric Types
+
+The chapter also demos a `Vector` class using `__add__` and `__mul__` so that `v1 + v2` and `v * scalar` work naturally.
+
+```python
+class Vector:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
+    def __repr__(self):
+        return f'Vector({self.x!r}, {self.y!r})'
+
+    def __add__(self, other):
+        return Vector(self.x + other.x, self.y + other.y)
+
+    def __mul__(self, scalar):
+        return Vector(self.x * scalar, self.y * scalar)
+```
+
+---
+
+## `__repr__` vs `__str__`
+
+| Method | Used by | Purpose |
+|--------|---------|---------|
+| `__repr__` | `repr()`, interactive shell, debugger | Unambiguous dev-facing representation |
+| `__str__` | `str()`, `print()` | Readable user-facing representation |
+
+If you only implement one, implement `__repr__` — it's used as fallback for `__str__` too.
+
+---
+
+## Boolean Value of Custom Objects — `__bool__`
+
+Python calls `__bool__` on an object when it's used in a boolean context (`if obj`, `while obj`). If `__bool__` is not defined, Python falls back to `__len__` — a zero-length object is falsy. If neither exists, the object is always truthy.
+
+---
+
+## Why `len()` is Not a Method
+
+`len(x)` is a built-in function, not `x.len()`. This is an intentional design choice — built-ins like `len`, `abs`, etc. are part of the data model interface and can be optimized at the interpreter level (e.g., `len` on a list reads a field directly, no method call overhead).
+
+---
+
+## Collection API
+
+The chapter briefly introduces the core collection ABCs:
+
+- `Iterable` → `__iter__`
+- `Sized` → `__len__`
+- `Container` → `__contains__`
+- `Sequence`, `Mapping`, `Set` all build on these
+
+---
+
+## Key Takeaways
+
+- The Python Data Model = a framework for making objects behave consistently with the rest of the language.
+- Implementing special methods means your objects work with `len()`, `for`, `in`, `[]`, operators, etc. — without inheriting from anything special.
+- Prefer `__repr__` over `__str__` if you only implement one.
+- Python's consistency is a feature: once you learn the data model, you can *predict* how new features will behave.
+
+---
+
+*Source: Fluent Python, 2nd Edition — Luciano Ramalho, Chapter 1*
