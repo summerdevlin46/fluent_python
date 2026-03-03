@@ -37,6 +37,84 @@ List comprehensions are the idiomatic way to build a new list by filtering or tr
 
 ```python
 # Instead of this:
+# Chapter 2 — An Array of Sequences
+### Sections covered: Overview of Built-In Sequences → Generator Expressions
+
+> **Core idea:** Python's sequence types share a common interface. Understanding how they're categorized — and using listcomps and genexps correctly — is fundamental to writing idiomatic Python.
+
+---
+
+## Overview of Built-In Sequences
+
+Python sequences can be grouped along **two axes**:
+
+### By what they store
+
+| Type | Description | Examples |
+|------|-------------|---------|
+| **Container sequences** | Hold references to other objects; can store mixed types | `list`, `tuple`, `collections.deque` |
+| **Flat sequences** | Physically store values in their own memory; limited to atomic types | `str`, `bytes`, `array.array` |
+
+Flat sequences are more compact and faster, but can only hold primitives (numbers, characters, bytes). Container sequences are more flexible but can surprise you when they hold mutable objects.
+
+### By mutability
+
+| Type | Examples |
+|------|---------|
+| **Mutable** | `list`, `bytearray`, `array.array`, `collections.deque` |
+| **Immutable** | `tuple`, `str`, `bytes` |
+
+> ⚠️ "Immutable" doesn't mean deeply immutable. A `tuple` containing a `list` can still have its contents changed — the tuple can't be reassigned, but the inner list can be mutated.
+
+---
+
+## List Comprehensions (Listcomps)
+
+List comprehensions are the idiomatic way to build a new list by filtering or transforming an iterable.
+
+### Basic syntax
+
+```python
+# Instead of this:
+# Chapter 2 — An Array of Sequences
+### Sections covered: Overview of Built-In Sequences → Generator Expressions
+
+> **Core idea:** Python's sequence types share a common interface. Understanding how they're categorized — and using listcomps and genexps correctly — is fundamental to writing idiomatic Python.
+
+---
+
+## Overview of Built-In Sequences
+
+Python sequences can be grouped along **two axes**:
+
+### By what they store
+
+| Type | Description | Examples |
+|------|-------------|---------|
+| **Container sequences** | Hold references to other objects; can store mixed types | `list`, `tuple`, `collections.deque` |
+| **Flat sequences** | Physically store values in their own memory; limited to atomic types | `str`, `bytes`, `array.array` |
+
+Flat sequences are more compact and faster, but can only hold primitives (numbers, characters, bytes). Container sequences are more flexible but can surprise you when they hold mutable objects.
+
+### By mutability
+
+| Type | Examples |
+|------|---------|
+| **Mutable** | `list`, `bytearray`, `array.array`, `collections.deque` |
+| **Immutable** | `tuple`, `str`, `bytes` |
+
+> ⚠️ "Immutable" doesn't mean deeply immutable. A `tuple` containing a `list` can still have its contents changed — the tuple can't be reassigned, but the inner list can be mutated.
+
+---
+
+## List Comprehensions (Listcomps)
+
+List comprehensions are the idiomatic way to build a new list by filtering or transforming an iterable.
+
+### Basic syntax
+
+```python
+# Instead of this:
 codes = []
 for symbol in '$¢£¥€¤':
     codes.append(ord(symbol))
@@ -148,6 +226,175 @@ sum((ord(s) for s in symbols)) # Also OK, just redundant
 - Genexps and listcomps both support **cartesian products** with multiple `for` clauses.
 
 ---
+
+## Tuples Are Not Just Immutable Lists
+
+Tuples do double duty in Python: they work as **immutable lists** and as **records with no field names**. The record use is often overlooked but is just as important.
+
+### Tuples as Records
+
+When used as records, each item in a tuple holds data for one field, and the **position gives it meaning**. Swapping or reordering items would break the data.
+
+```python
+# Coordinates — position is the meaning
+tokyo = (35.689722, 139.691667)
+city, year, pop = ('Tokyo', 2003, 32_450)
+
+# Iterating over structured records
+traveler_ids = [('USA', '31195855'), ('BRA', 'CE342567'), ('ESP', 'XDA205856')]
+for country, passport in sorted(traveler_ids):
+    print(f'{country}/{passport}')
+```
+
+The `_` convention is used to discard items you don't need during unpacking:
+
+```python
+_, passport = ('USA', '31195855')  # only care about the passport
+```
+
+### Tuples as Immutable Lists
+
+When used as an immutable list, tuples signal that the sequence won't change. Two practical benefits: clarity of intent, and potential performance gains (Python can optimize fixed-length tuples).
+
+> ⚠️ A tuple's *immutability applies to the references it holds*, not the objects themselves. A tuple containing a list can still have that list mutated — just not replaced.
+
+```python
+t = (1, [2, 3])
+t[1].append(4)  # This works — the list inside is mutable
+t[1] = [9]      # This fails — can't reassign the tuple's reference
+```
+
+### Named Tuples
+
+`collections.namedtuple` creates tuple subclasses with field names, making record-style tuples much more readable without the memory overhead of a full object.
+
+```python
+from collections import namedtuple
+
+City = namedtuple('City', 'name country population coordinates')
+tokyo = City('Tokyo', 'JP', 36.933, (35.689722, 139.691667))
+
+tokyo.name        # 'Tokyo'
+tokyo.population  # 36.933
+```
+
+Useful named tuple attributes:
+- `._fields` — tuple of field names
+- `._make(iterable)` — create an instance from any iterable
+- `._asdict()` — return as a `dict`
+
+```python
+City._fields  # ('name', 'country', 'population', 'coordinates')
+tokyo._asdict()  # {'name': 'Tokyo', 'country': 'JP', ...}
+```
+
+### Comparing Tuple and List Methods
+
+Tuples support all list methods that don't involve adding or removing items. The main things tuples *lack* compared to lists are `append`, `clear`, `insert`, `pop`, `remove`, `reverse`, and `sort`. Everything read-only (indexing, counting, slicing, `in`) works the same.
+
+---
+
+## Unpacking Sequences and Iterables
+
+Unpacking is one of Python's most elegant features — it lets you assign the items of any iterable to multiple variables in a single statement. It works with any iterable, not just tuples or lists.
+
+### Basic unpacking
+
+```python
+coordinates = (35.689722, 139.691667)
+lat, lon = coordinates  # clean, readable, no indexing needed
+
+# Swap variables without a temp — a classic Python idiom
+a, b = b, a
+```
+
+### Using `*` to grab excess items
+
+The `*` operator lets you capture a variable number of "leftover" items into a list. It can appear anywhere in the assignment — beginning, middle, or end:
+
+```python
+first, *rest = [1, 2, 3, 4, 5]
+# first = 1, rest = [2, 3, 4, 5]
+
+*head, last = [1, 2, 3, 4, 5]
+# head = [1, 2, 3, 4], last = 5
+
+first, *middle, last = [1, 2, 3, 4, 5]
+# first = 1, middle = [2, 3, 4], last = 5
+```
+
+The `*` variable always receives a list, even if it captures zero or one item.
+
+### Unpacking with `*` in function calls and sequence literals
+
+`*` can be used to unpack iterables into function calls or when building new sequences:
+
+```python
+# In function calls
+def add(a, b, c): return a + b + c
+args = (1, 2, 3)
+add(*args)  # same as add(1, 2, 3)
+
+# In sequence literals (Python 3.5+)
+a = [1, 2]
+b = [3, 4]
+[*a, *b]       # [1, 2, 3, 4]
+(*a, *b)       # (1, 2, 3, 4)
+{*a, *b}       # {1, 2, 3, 4}
+```
+
+### Nested unpacking
+
+The target of an unpacking assignment can have nested tuples — Python will match the structure as long as it mirrors the shape of the data:
+
+```python
+metro_areas = [
+    ('Tokyo', 'JP', 36.933, (35.689722, 139.691667)),
+]
+
+for name, _, _, (lat, lon) in metro_areas:
+    print(f'{name}: {lat}, {lon}')
+```
+
+The nested `(lat, lon)` unpacks the inner tuple directly in the `for` loop.
+
+### Pattern Matching with sequences (Python 3.10+)
+
+The `match/case` statement introduced in Python 3.10 supports sequence patterns — a powerful extension of unpacking that can match on structure, type, and value simultaneously:
+
+```python
+def handle(command):
+    match command.split():
+        case ['quit']:
+            print('Quitting')
+        case ['go', direction]:
+            print(f'Going {direction}')
+        case ['pick', item, 'from', container]:
+            print(f'Picking {item} from {container}')
+        case _:
+            print('Unknown command')
+```
+
+Pattern matching is more expressive than `if/elif` chains for complex branching on sequence shapes.
+
+---
+
+## Key Takeaways (updated)
+
+- Tuples serve **two roles**: lightweight records (position = meaning) and immutable lists — don't conflate them.
+- Use `namedtuple` when you want a tuple with self-documenting field names and no class overhead.
+- A tuple is only truly immutable if all its contents are immutable — watch out for mutable items inside.
+- **Unpacking** works with any iterable and is almost always cleaner than indexing.
+- Use `*` to capture leftover items, unpack into function calls, or merge sequences.
+- Nested unpacking mirrors the shape of your data structure directly in the assignment.
+- Python 3.10+ `match/case` extends unpacking into full structural pattern matching.
+
+---
+
+*Source: Fluent Python, 2nd Edition — Luciano Ramalho, Chapter 2 (partial)*  
+*Remaining sections: Slicing, `+` and `*` with Sequences, Augmented Assignment, `sort` and `sorted`, `bisect`, Arrays, Memory Views, Deques — to be added*require `lambda`.
+
+```python
 
 *Source: Fluent Python, 2nd Edition — Luciano Ramalho, Chapter 2 (partial)*  
 *Remaining sections: Tuples, Unpacking, Slicing, Arrays, Deques — to be added*
