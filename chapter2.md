@@ -377,6 +377,145 @@ def handle(command):
 
 Pattern matching is more expressive than `if/elif` chains for complex branching on sequence shapes.
 
+---# Pattern Matching with Sequences
+
+> **New in Python 3.10.** `match/case` brings structural pattern matching to Python — it's more powerful than `if/elif` chains when branching on the shape or content of a sequence.
+
+### How sequence patterns work
+
+A `case` clause matches if the subject is a sequence whose items match the pattern positionally. Unlike unpacking, patterns can also check literal values and types simultaneously:
+
+```python
+def handle(command):
+    match command.split():
+        case ['quit']:
+            print('Quitting')
+        case ['go', direction]:
+            print(f'Going {direction}')
+        case ['go', direction] if direction in ('north', 'south'):
+            print(f'Going {direction}')  # guard clause
+        case ['pick', item, 'from', container]:
+            print(f'Picking {item} from {container}')
+        case _:
+            print(f'Unknown command')
+```
+
+The `case _:` wildcard is the catch-all — equivalent to `else`.
+
+### Key rules for sequence patterns
+
+- Any sequence type can be matched (lists, tuples, etc.) — but **not** `str`, `bytes`, or `bytearray` (they are sequences but treated as atomic values in patterns).
+- You can use `*extra` inside a pattern to capture remaining items, just like in unpacking:
+
+```python
+match record:
+    case [name, *rest]:
+        print(f'Name: {name}, rest: {rest}')
+```
+
+- Type constraints can be added inline:
+
+```python
+match point:
+    case [int(x), int(y)]:
+        print(f'Integer point: {x}, {y}')
+```
+
+- **Guard clauses** (`if` after a `case`) add extra conditions that must be true for the case to match.
+
+### Pattern matching in an interpreter (the book's example)
+
+The book demonstrates `match/case` by building a simple Scheme-like interpreter where commands are represented as lists. Pattern matching lets you express complex dispatch logic cleanly — matching on command length, specific keywords, and variable capture all in one `case` clause — something that would require deeply nested `if/elif` chains otherwise.
+
+---
+
+## Slicing
+
+Slicing is a core feature of Python sequences — it lets you extract sub-sequences without writing loops, and on mutable sequences, you can also assign to slices.
+
+### Why slices and ranges exclude the last item
+
+Python uses exclusive upper bounds throughout (`s[a:b]` includes index `a` up to but *not* `b`). There are three practical reasons:
+
+1. It's easy to see the length of a slice: `s[:3]` has 3 items.
+2. Non-overlapping ranges split cleanly: `s[:3]` and `s[3:]` partition `s` with no duplication or gap.
+3. It works naturally with zero-based indexing.
+
+```python
+s = 'bicycle'
+s[:3]   # 'bic'  — first 3 characters
+s[3:]   # 'ycle' — everything from index 3 onward
+```
+
+The case for exclusive upper bounds was famously argued by Dutch computer scientist Edsger W. Dijkstra — the short version is that it makes length calculations and non-overlapping splits trivially clean, and it composes naturally with zero-based indexing.
+
+### Stride and step: `s[a:b:c]`
+
+The full slice notation `s[a:b:c]` accepts a third argument — the **step** (or stride). It causes the slice to skip items, and a negative step reverses direction:
+
+```python
+s = 'bicycle'
+s[::3]   # 'bye'     — every 3rd character
+s[::-1]  # 'elcycib' — reversed
+s[::-2]  # 'eccb'    — reversed, every 2nd character
+```
+
+A negative stride is the idiomatic way to reverse a sequence in Python. Note that `a` and `b` can be omitted when using a step — Python fills in the appropriate start/end automatically.
+
+### Slice objects
+
+Slices are actually `slice(start, stop, step)` objects under the hood. You can name them for readability — especially useful when working with fixed-format data like CSV files or byte streams:
+
+```python
+# Instead of magic index numbers:
+UNIT_PRICE = slice(40, 52)
+DESCRIPTION = slice(6, 40)
+
+line = '...'
+print(line[DESCRIPTION], line[UNIT_PRICE])
+```
+
+Named slices make code self-documenting and easy to update.
+
+### Multidimensional slicing and ellipsis
+
+Python's `[]` operator can accept **comma-separated indices or slices** for multidimensional access. This is used by libraries like NumPy:
+
+```python
+import numpy as np
+a = np.array([[1, 2, 3], [4, 5, 6]])
+a[1, :]    # second row: array([4, 5, 6])
+a[:, 1]    # second column: array([2, 5])
+a[1, 1:3]  # row 1, columns 1–2: array([5, 6])
+```
+
+The **ellipsis** (`...`) is shorthand for "all remaining dimensions" in NumPy:
+
+```python
+x[i, ...]   # equivalent to x[i, :, :, :] for a 4D array
+```
+
+In plain Python lists, multidimensional indexing is not supported — only one index at a time.
+
+### Assigning to slices
+
+On **mutable** sequences, you can assign to a slice to replace, insert, or delete a range of items in-place:
+
+```python
+l = list(range(10))   # [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+
+l[2:5] = [20, 30]     # replace items 2–4 with two values
+# [0, 1, 20, 30, 5, 6, 7, 8, 9]
+
+del l[5:7]            # delete items at index 5 and 6
+# [0, 1, 20, 30, 5, 8, 9]
+
+l[3::2] = [11, 22]    # assign to a strided slice
+# [0, 1, 20, 11, 5, 22, 9]
+```
+
+> ⚠️ When assigning to a slice, the right-hand side must be an iterable — even if you're replacing with a single value, it must be wrapped in a list or other iterable.
+
 ---
 
 ## Key Takeaways (updated)
@@ -387,12 +526,15 @@ Pattern matching is more expressive than `if/elif` chains for complex branching 
 - **Unpacking** works with any iterable and is almost always cleaner than indexing.
 - Use `*` to capture leftover items, unpack into function calls, or merge sequences.
 - Nested unpacking mirrors the shape of your data structure directly in the assignment.
-- Python 3.10+ `match/case` extends unpacking into full structural pattern matching.
+- `match/case` sequence patterns are more powerful than unpacking — they match on structure, value, and type at once, with optional guard clauses.
+- Slices use **exclusive upper bounds** — consistent with `range()` and zero-based indexing.
+- Name your slices with `slice()` objects to replace magic numbers with readable labels.
+- Mutable sequences support **slice assignment** — replace, insert, or delete ranges in-place.
 
 ---
 
 *Source: Fluent Python, 2nd Edition — Luciano Ramalho, Chapter 2 (partial)*  
-*Remaining sections: Slicing, `+` and `*` with Sequences, Augmented Assignment, `sort` and `sorted`, `bisect`, Arrays, Memory Views, Deques — to be added*require `lambda`.
+*Remaining sections: `+` and `*` with Sequences, Augmented Assignment, `sort` and `sorted`, `bisect`, Arrays, Memory Views, Deques — to be added*
 
 ```python
 
