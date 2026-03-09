@@ -518,6 +518,68 @@ l[3::2] = [11, 22]    # assign to a strided slice
 
 ---
 
+## Using `+` and `*` with Sequences
+
+> **Core idea:** Both `+` and `*` always produce a **new object** — they never modify either of the original sequences. But `*` with mutable objects has a subtle trap worth knowing.
+
+### Concatenation with `+`
+
+`+` joins two sequences of the **same type** into a new sequence:
+
+```python
+[1, 2, 3] + [4, 5, 6]   # [1, 2, 3, 4, 5, 6]
+(1, 2) + (3, 4)          # (1, 2, 3, 4)
+'abc' + 'def'            # 'abcdef'
+```
+
+Both operands must be the same type — you can't concatenate a list and a tuple directly.
+
+### Repetition with `*`
+
+`*` repeats a sequence a given number of times, producing a new sequence:
+
+```python
+[0] * 5        # [0, 0, 0, 0, 0]
+'abc' * 3      # 'abcabcabc'
+(1, 2) * 3     # (1, 2, 1, 2, 1, 2)
+```
+
+This is commonly used to initialise a list of a fixed size with a default value.
+
+### ⚠️ The Building Lists of Lists trap
+
+A common mistake when initialising nested lists with `*` is that the **same inner object gets repeated by reference**, not copied:
+
+```python
+# WRONG — all rows are the same list object
+board = [['_'] * 3] * 3
+board[1][1] = 'X'
+# [['_', 'X', '_'], ['_', 'X', '_'], ['_', 'X', '_']]
+# Changing one row changes all of them!
+```
+
+This happens because `* 3` copies the *reference* to the inner list three times, not the list itself. The fix is to use a listcomp, which creates a fresh list object for each row:
+
+```python
+# CORRECT — each row is a distinct list object
+board = [['_'] * 3 for _ in range(3)]
+board[1][1] = 'X'
+# [['_', '_', '_'], ['_', 'X', '_'], ['_', '_', '_']]
+```
+
+The listcomp version is equivalent to:
+
+```python
+board = []
+for _ in range(3):
+    row = ['_'] * 3   # a new list is created each iteration
+    board.append(row)
+```
+
+> 💡 **Rule of thumb:** Use `*` freely with immutable objects (ints, strings, tuples). For nested mutable objects like lists, always use a listcomp to ensure independent copies.
+
+---
+
 ## Key Takeaways (updated)
 
 - Tuples serve **two roles**: lightweight records (position = meaning) and immutable lists — don't conflate them.
@@ -530,6 +592,8 @@ l[3::2] = [11, 22]    # assign to a strided slice
 - Slices use **exclusive upper bounds** — consistent with `range()` and zero-based indexing.
 - Name your slices with `slice()` objects to replace magic numbers with readable labels.
 - Mutable sequences support **slice assignment** — replace, insert, or delete ranges in-place.
+- `+` and `*` always produce a **new sequence** — originals are never modified.
+- Never use `[obj] * n` to initialise nested mutable sequences — use a listcomp instead.
 
 ---
 
