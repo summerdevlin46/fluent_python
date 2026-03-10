@@ -578,6 +578,105 @@ for _ in range(3):
 
 > 💡 **Rule of thumb:** Use `*` freely with immutable objects (ints, strings, tuples). For nested mutable objects like lists, always use a listcomp to ensure independent copies.
 
+# When a List Is Not the Answer
+
+> **Core idea:** `list` is the go-to sequence, but it isn't always the right tool. For large volumes of numbers, or for sequences that need fast appends and pops from both ends, there are better-suited alternatives in the standard library.
+
+### `array.array` — for large sequences of numbers
+
+A Python `list` of numbers stores full Python `float` or `int` objects, each with its own overhead. `array.array` is a **flat sequence** that stores raw machine values (like C arrays), making it far more memory-efficient when you have millions of numeric values of a single type.
+
+```python
+from array import array
+from random import random
+
+# 'd' is the typecode for double-precision float (C double)
+floats = array('d', (random() for _ in range(10**7)))
+
+floats[0]   # fast access, same interface as list
+```
+
+`array.array` supports the full sequence protocol (indexing, slicing, iteration) and has efficient `.tofile()` and `.fromfile()` methods for binary I/O — much faster than writing floats as text.
+
+Common typecodes:
+
+| Typecode | C type | Python type |
+|----------|--------|-------------|
+| `'b'` | signed char | int |
+| `'B'` | unsigned char | int |
+| `'h'` | signed short | int |
+| `'i'` | signed int | int |
+| `'f'` | float | float |
+| `'d'` | double | float |
+
+> Use `array.array` when: you have a large, homogeneous collection of numbers and memory or I/O performance matters.
+
+### `memoryview` — zero-copy inspection of binary data
+
+A `memoryview` lets you **inspect and manipulate the raw bytes** of objects that support the buffer protocol (`array`, `bytes`, `bytearray`) without copying data. This is important for high-performance code that processes binary data.
+
+```python
+from array import array
+
+numbers = array('h', [-2, -1, 0, 1, 2])  # 'h' = signed short (2 bytes each)
+memv = memoryview(numbers)
+
+# Reinterpret the same bytes as unsigned bytes ('B') — no data is copied
+memv_oct = memv.cast('B')
+memv_oct.tolist()  # [254, 255, 255, 255, 0, 0, 1, 0, 2, 0]
+
+# Modifying through the memoryview changes the original array in place
+memv_oct[5] = 4
+numbers[2]  # 1024 — the underlying array was modified
+```
+
+`memoryview` is mostly useful in lower-level, performance-sensitive code — networking, image processing, binary file formats. You won't reach for it often, but it's good to know it exists.
+
+### NumPy — for serious numerical computing
+
+For advanced array and matrix operations, **NumPy** is the standard. It provides multi-dimensional arrays (`ndarray`) with vectorised operations, broadcasting, and a rich suite of mathematical functions — all implemented in C for speed.
+
+```python
+import numpy as np
+
+a = np.arange(12)         # array([0, 1, 2, ..., 11])
+a.shape                   # (12,)
+a.shape = (3, 4)          # reshape to 3×4 matrix — no data copied
+a[2]                      # third row: array([8, 9, 10, 11])
+a[:, 1]                   # second column: array([1, 5, 9])
+a.transpose()             # flip rows and columns
+```
+
+NumPy supports the full slicing syntax, including multidimensional slicing and ellipsis (`...`). Operations like `a * 2` or `a + b` work element-wise without any Python loops — this is called **vectorisation** and is the key to NumPy's performance.
+
+> NumPy is outside the standard library but is the foundation of scientific Python (SciPy, pandas, scikit-learn). If you work with numerical data at any scale, it's essential to know.
+
+### `collections.deque` — for fast appends and pops at both ends
+
+A `list` is efficient for appends and pops at the **right end**, but inserting or removing from the **left** is O(n) because every element has to be shifted. `collections.deque` (double-ended queue) is designed to be fast at both ends:
+
+```python
+from collections import deque
+
+dq = deque(range(10), maxlen=10)  # maxlen is optional — fixes the capacity
+dq.appendleft(-1)   # fast O(1) — pushes onto the left
+dq.append(10)       # fast O(1) — pushes onto the right; drops leftmost if maxlen reached
+dq.rotate(3)        # rotate right by 3: last 3 items move to the front
+dq.rotate(-4)       # rotate left by 4
+```
+
+The `maxlen` parameter is very handy — it turns the deque into a fixed-length **sliding window**: once full, adding a new item automatically discards the item from the opposite end.
+
+Deques support most list operations (slicing is a notable exception) and are also thread-safe for appends and pops from either end.
+
+| Use case | Best choice |
+|----------|-------------|
+| General-purpose mutable sequence | `list` |
+| Large sequence of numbers, memory efficiency | `array.array` |
+| Fast appends/pops from both ends | `collections.deque` |
+| Numerical / matrix computing | `numpy.ndarray` |
+| Inspecting binary data without copying | `memoryview` |
+
 ---
 
 ## Key Takeaways (updated)
@@ -594,6 +693,10 @@ for _ in range(3):
 - Mutable sequences support **slice assignment** — replace, insert, or delete ranges in-place.
 - `+` and `*` always produce a **new sequence** — originals are never modified.
 - Never use `[obj] * n` to initialise nested mutable sequences — use a listcomp instead.
+- Reach for `array.array` over `list` when storing large volumes of a single numeric type.
+- Use `deque` when you need fast O(1) appends and pops from **both ends**, or a sliding window with `maxlen`.
+- `memoryview` allows zero-copy inspection and manipulation of binary data.
+- NumPy's `ndarray` is the right tool for any serious numerical or matrix computing.
 
 ---
 
