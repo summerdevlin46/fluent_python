@@ -1,0 +1,201 @@
+# Fluent Python – Chapter 3: Dictionaries and Sets
+## Notes: Modern `dict` Syntax & Pattern Matching with Mappings
+
+---
+
+## 1. Modern `dict` Syntax
+
+### 1.1 `dict` Comprehensions
+
+A **dict comprehension** (`dictcomp`) builds a `dict` instance by producing key-value pairs from any iterable, similar to how list comprehensions build lists.
+
+**Basic syntax:**
+```python
+{key_expr: value_expr for item in iterable}
+```
+
+**Example:**
+```python
+dial_codes = [
+    (880, 'Bangladesh'),
+    (55,  'Brazil'),
+    (86,  'China'),
+    (91,  'India'),
+    (62,  'Indonesia'),
+    (81,  'Japan'),
+    (234, 'Nigeria'),
+    (92,  'Pakistan'),
+    (7,   'Russia'),
+    (1,   'United States'),
+]
+
+# Build dict: country -> dial code
+country_dial = {country: code for code, country in dial_codes}
+# {'Bangladesh': 880, 'Brazil': 55, ...}
+
+# Filtered + transformed: code -> country, only codes >= 70
+{code: country.upper()
+ for country, code in sorted(country_dial.items())
+ if code < 70}
+# {55: 'BRAZIL', 62: 'INDONESIA', 7: 'RUSSIA', 1: 'UNITED STATES'}
+```
+
+> **Key point:** Compared to calling `dict()` with a list of pairs, dictcomps are more readable and flexible—any mapping or iterable of pairs can serve as the source.
+
+---
+
+### 1.2 Unpacking Mappings
+
+Python supports two ways to unpack mappings using `**`.
+
+#### In function calls
+`**` unpacks a mapping into keyword arguments. You can use it **multiple times** in the same call, as long as keys are not duplicated (unless the function accepts `**kwargs`):
+
+```python
+def dump(**kwargs):
+    return kwargs
+
+dump(**{'x': 1}, y=2, **{'z': 3})
+# {'x': 1, 'y': 2, 'z': 3}
+```
+
+#### In `dict` literals
+Also introduced in PEP 448, `**` can appear inside `{...}` literals, allowing multiple mappings to be merged inline. Duplicate keys are allowed here—later values overwrite earlier ones:
+
+```python
+{'a': 0, **{'x': 1}, 'y': 2, **{'z': 3, 'x': 4}}
+# {'a': 0, 'x': 4, 'y': 2, 'z': 3}
+```
+
+---
+
+### 1.3 Merging Mappings with `|`
+
+**Python 3.9+** introduced two new operators for merging mappings:
+
+| Operator | Behaviour |
+|----------|-----------|
+| `d1 \| d2` | Creates a **new** `dict` merging `d1` and `d2`; `d2` values win on duplicate keys |
+| `d1 \|= d2` | **Updates** `d1` in place with values from `d2` |
+
+```python
+d1 = {'a': 1, 'b': 3}
+d2 = {'a': 2, 'b': 4, 'c': 6}
+
+d1 | d2
+# {'a': 2, 'b': 4, 'c': 6}
+
+d1 |= d2
+# d1 is now {'a': 2, 'b': 4, 'c': 6}
+```
+
+> **Comparison with `{**d1, **d2}`:** The `|` operator is cleaner and also works with any `Mapping`-compatible type on the right-hand side, not just `dict`. The `|=` augmented assignment updates in place (no new object created).
+
+---
+
+## 2. Pattern Matching with Mappings
+
+Pattern matching (`match/case`, new in **Python 3.10**) has first-class support for mapping patterns.
+
+### 2.1 Basic Mapping Patterns
+
+A mapping pattern looks like a `dict` literal inside a `case` clause:
+
+```python
+def process_command(command):
+    match command:
+        case {'action': action, 'object': obj}:
+            print(f'Doing {action} on {obj}')
+        case {'action': action}:
+            print(f'Doing {action} with no object')
+        case _:
+            print('Unknown command')
+```
+
+**Rules for mapping patterns:**
+- The pattern matches any mapping (not just `dict`) that contains **at least** the specified keys.
+- Extra keys in the subject are **ignored** — unlike sequence patterns, which require an exact length match.
+- Values in the pattern can be literals (matched exactly) or capture variables (bound to the value).
+
+```python
+food = {'category': 'ice cream', 'flavour': 'vanilla', 'cost': 199}
+
+match food:
+    case {'category': 'ice cream', 'flavour': flavour}:
+        print(f'Ice cream flavour: {flavour}')
+    # Matches! Prints: Ice cream flavour: vanilla
+    # 'cost' key is simply ignored
+```
+
+---
+
+### 2.2 Capturing Extra Items with `**rest`
+
+You can capture all remaining key-value pairs not matched by the pattern using `**rest` (or any `**` variable name):
+
+```python
+match food:
+    case {'category': 'ice cream', **rest}:
+        print(f'Ice cream details: {rest}')
+    # Prints: Ice cream details: {'flavour': 'vanilla', 'cost': 199}
+```
+
+> `**_` is **not** valid in a pattern — you must provide a real name for the variable.
+
+---
+
+### 2.3 Key Behaviours and Gotchas
+
+**Partial matching is by design.** Because mapping patterns only require the listed keys to be present, they are well-suited to processing semi-structured data such as JSON API responses, where unknown keys should be tolerated.
+
+**Keys must be literals.** The keys in a mapping pattern must be string, integer, or other literal values (or enum values) — they cannot be variables. Only the *values* in the pattern can be capture variables.
+
+```python
+# VALID: key is a string literal, value is a capture variable
+case {'name': name}:  ...
+
+# INVALID: key cannot be a variable
+case {key: 'value'}:  ...  # SyntaxError
+```
+
+**Automatic `isinstance` check.** The interpreter verifies that the subject is an instance of `collections.abc.Mapping` before attempting to match keys. Plain objects are not matched even if they have `__getitem__`.
+
+---
+
+### 2.4 Practical Example — Processing API Responses
+
+Mapping patterns shine when handling heterogeneous records, e.g., from a JSON API:
+
+```python
+def handle_record(record):
+    match record:
+        case {'type': 'book', 'api': 2, 'title': title, 'authors': [*authors]}:
+            print(f'Book v2: {title!r}, authors: {authors}')
+        case {'type': 'book', 'api': 1, 'title': title, 'author': author}:
+            print(f'Book v1: {title!r}, single author: {author}')
+        case {'type': 'book'}:
+            raise ValueError(f'Invalid book record: {record!r}')
+        case {'type': t}:
+            raise ValueError(f'Unknown record type: {t!r}')
+        case _:
+            raise ValueError(f'Record is not a dict: {record!r}')
+```
+
+Key observations from this example:
+- Cases are checked top-to-bottom; the **first matching case wins**.
+- Combining mapping patterns with **sequence patterns** (e.g., `[*authors]`) is fully supported.
+- A bare `{'type': 'book'}` catch-all at the end handles malformed book records with a useful error.
+
+---
+
+## Summary
+
+| Feature | Available Since | One-liner |
+|---------|----------------|-----------|
+| Dict comprehensions | Python 2.7 / 3.0 | `{k: v for k, v in pairs}` |
+| `**` unpacking in calls & literals | Python 3.5 (PEP 448) | `{**d1, **d2}` |
+| `\|` merge operator | Python 3.9 | `d1 \| d2` creates new dict |
+| `\|=` update operator | Python 3.9 | `d1 \|= d2` updates in place |
+| Mapping patterns (`match/case`) | Python 3.10 | `case {'key': value}:` |
+
+> **Rule of thumb:** Mapping patterns perform *partial* matching (extra keys are ignored), which makes them ideal for processing real-world data with optional or evolving fields.
