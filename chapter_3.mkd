@@ -199,3 +199,211 @@ Key observations from this example:
 | Mapping patterns (`match/case`) | Python 3.10 | `case {'key': value}:` |
 
 > **Rule of thumb:** Mapping patterns perform *partial* matching (extra keys are ignored), which makes them ideal for processing real-world data with optional or evolving fields.
+
+## 3. Standard API of Mapping Types
+ 
+### 3.1 What Is Hashable
+ 
+An object is **hashable** if it has a hash value that never changes during its lifetime and can be compared to other objects. Hashability is required for dict keys and set members because both data structures are backed by hash tables.
+ 
+The built-in `hash()` function works on hashable types. The rules are:
+ 
+- Numeric types that compare equal have the same hash, even across types (e.g., `hash(1) == hash(1.0)`).
+- All **immutable built-in types** are hashable: `int`, `float`, `str`, `bytes`, `tuple` (if all its items are also hashable), `frozenset`.
+- **Mutable built-in types** are **not** hashable: `list`, `dict`, `set`.
+- User-defined objects are hashable by default (their hash is derived from their `id()`), unless they implement `__eq__` without also implementing `__hash__`.
+ 
+```python
+>>> hash((1, 2, 3))        # OK — all items are hashable
+2528502973977326415
+>>> hash((1, 2, [3, 4]))   # raises TypeError — list inside
+TypeError: unhashable type: 'list'
+```
+ 
+> **Implication for tuples:** A tuple containing a mutable item (like a list) is not hashable and cannot be used as a dict key or set element.
+ 
+---
+ 
+### 3.2 Overview of Common Mapping Methods
+ 
+The `dict`, `collections.defaultdict`, and `collections.OrderedDict` classes all share a large common API. The most important methods to know:
+ 
+| Method | Description |
+|--------|-------------|
+| `d[key]` | Returns value for `key`; raises `KeyError` if missing |
+| `d.get(key, default=None)` | Returns value or `default` if key is missing |
+| `d.setdefault(key, default)` | Returns `d[key]` if it exists; otherwise sets `d[key] = default` and returns `default` |
+| `d[key] = value` | Sets or overwrites `key` |
+| `del d[key]` | Removes `key`; raises `KeyError` if missing |
+| `key in d` | Membership test (`__contains__`) |
+| `d.keys()` | Returns a view of all keys |
+| `d.values()` | Returns a view of all values |
+| `d.items()` | Returns a view of all `(key, value)` pairs |
+| `d.update(other)` | Merges `other` (dict or iterable of pairs) into `d` in place |
+| `d.pop(key, default)` | Removes and returns `d[key]`, or `default` if missing |
+| `d.popitem()` | Removes and returns the last inserted `(key, value)` pair (LIFO) |
+| `d.clear()` | Removes all items |
+| `d.copy()` | Returns a shallow copy |
+ 
+> **`dict.get()` vs `dict[key]`:** Use `.get()` whenever a missing key is a normal, expected case. Use `d[key]` when a missing key is a bug and you want to fail loudly.
+ 
+---
+ 
+### 3.3 Inserting or Updating Mutable Values
+ 
+A common pattern is building a dict where each value is a list (or other mutable container) that accumulates items. There are three idiomatic approaches:
+ 
+#### Option A — `dict.setdefault()`
+ 
+`setdefault` handles the lookup and initialisation in a single call, avoiding a redundant second key lookup:
+ 
+```python
+# Building an index: word -> list of line numbers
+import re
+import sys
+ 
+WORD_RE = re.compile(r'\w+')
+ 
+index = {}
+with open(sys.argv[1], encoding='utf-8') as fp:
+    for line_no, line in enumerate(fp, 1):
+        for match in WORD_RE.finditer(line):
+            word = match.group()
+            column_no = match.start() + 1
+            location = (line_no, column_no)
+            # Cleaner than a get() + assignment pair:
+            index.setdefault(word, []).append(location)
+```
+ 
+The key line is equivalent to—but more efficient than—this two-step version:
+ 
+```python
+if word not in index:
+    index[word] = []
+index[word].append(location)
+```
+ 
+`setdefault` performs only **one** key lookup instead of two, which matters in tight loops.
+ 
+#### Option B — `defaultdict`
+ 
+See Section 4.1 below for the `defaultdict` approach, which is often even more concise.
+ 
+#### Option C — `__missing__`
+ 
+See Section 4.2 below for building a subclass that overrides `__missing__`.
+ 
+---
+ 
+## 4. Automatic Handling of Missing Keys
+ 
+When accessing a key that does not exist in a `dict`, Python raises `KeyError`. Two standard mechanisms let you handle this gracefully without cluttering code with `if key not in d` guards everywhere.
+ 
+### 4.1 `defaultdict`: Another Take on Missing Keys
+ 
+`collections.defaultdict` takes a **callable** as its first argument. When a missing key is accessed via `d[key]` (i.e. `__getitem__`), the callable is invoked with no arguments to produce a default value, which is then stored under that key and returned.
+ 
+```python
+import collections
+import re
+import sys
+ 
+WORD_RE = re.compile(r'\w+')
+ 
+# The default_factory is `list` — called as list() for each new key
+index = collections.defaultdict(list)
+ 
+with open(sys.argv[1], encoding='utf-8') as fp:
+    for line_no, line in enumerate(fp, 1):
+        for match in WORD_RE.finditer(line):
+            word = match.group()
+            column_no = match.start() + 1
+            location = (line_no, column_no)
+            index[word].append(location)  # no setdefault needed
+```
+ 
+**Important details:**
+- The `default_factory` is called only on `__getitem__` access, **not** on `d.get(key)` or `key in d`. Those still behave like a plain `dict`.
+- The `default_factory` attribute is set to the callable you pass. Setting `dd.default_factory = None` disables the automatic default behaviour.
+- Any zero-argument callable works: `list`, `dict`, `set`, `int`, `lambda: 'N/A'`, etc.
+ 
+```python
+dd = collections.defaultdict(list)
+dd['new_key']      # triggers default_factory -> []
+# dd is now {'new_key': []}
+ 
+dd.get('other')    # returns None — default_factory NOT called
+```
+ 
+---
+ 
+### 4.2 The `__missing__` Method
+ 
+All standard mapping types call `__missing__` when `__getitem__` fails to find a key, **if** `__missing__` is defined. This gives you full control over the "missing key" logic when subclassing `dict` or `UserDict`.
+ 
+`defaultdict` uses this hook internally; you can define it yourself too:
+ 
+```python
+class StrKeyDict0(dict):
+    """A dict that converts non-string keys to strings on lookup."""
+ 
+    def __missing__(self, key):
+        if isinstance(key, str):
+            raise KeyError(key)        # avoid infinite recursion
+        return self[str(key)]          # retry with str version of key
+ 
+    def get(self, key, default=None):
+        try:
+            return self[key]           # delegates to __getitem__ -> __missing__
+        except KeyError:
+            return default
+ 
+    def __contains__(self, key):
+        return key in self.keys() or str(key) in self.keys()
+```
+ 
+Usage:
+```python
+d = StrKeyDict0([('2', 'two'), ('4', 'four')])
+d[2]        # returns 'two'  — int 2 -> str '2'
+d.get(2)    # returns 'two'
+d.get(1, 'N/A')  # returns 'N/A'
+2 in d      # True
+1 in d      # False
+```
+ 
+**Key points about `__missing__`:**
+- It is only called by `__getitem__`, **not** by `get()` or `__contains__`. You must override those separately if you want consistent behaviour across all access methods (as done above).
+- Always guard against infinite recursion: if the converted key is still not found, re-raising `KeyError` is the right move.
+- `UserDict` (from `collections`) is often a better base class than `dict` when implementing custom mappings, because `dict`'s built-in methods sometimes bypass `__missing__` in subtle ways.
+ 
+---
+ 
+### 4.3 Inconsistent Usage of `__missing__` in the Standard Library
+ 
+The book notes a subtle inconsistency worth knowing: `__missing__` is called **only by `dict.__getitem__`**. The following standard methods do **not** consult `__missing__`:
+ 
+| Method | Calls `__missing__`? |
+|--------|----------------------|
+| `d[key]` (`__getitem__`) | ✅ Yes |
+| `d.get(key)` | ❌ No |
+| `key in d` (`__contains__`) | ❌ No |
+ 
+This means a `defaultdict` or `dict` subclass with `__missing__` does **not** auto-create entries when you call `d.get('missing')` — it simply returns `None`. This is usually desirable (you don't want `get()` to silently mutate the dict), but it is a potential source of confusion if you expect the custom fallback to apply universally.
+ 
+---
+ 
+## Summary
+ 
+| Feature | Key Takeaway |
+|---------|-------------|
+| Dict comprehensions | `{k: v for k, v in pairs}` — builds dicts from any iterable |
+| `**` unpacking | Works in function calls and `{...}` literals; later keys win on duplicates |
+| `\|` / `\|=` operators | Python 3.9+; clean merge without `{**d1, **d2}` |
+| Mapping `match/case` patterns | Partial match (extra keys ignored); keys must be literals |
+| Hashability | Required for dict keys/set members; mutable types are not hashable |
+| `d.setdefault(k, default)` | One-lookup insert-or-append pattern for mutable values |
+| `collections.defaultdict` | Pass a `default_factory` callable; auto-creates entries on `d[key]` |
+| `__missing__` | Hook called by `__getitem__` only; override `get()` and `__contains__` separately |
+ 
+> **Rule of thumb:** Use `defaultdict` when all missing keys should receive the same type of default. Use `__missing__` (via a `dict` subclass or `UserDict`) when you need custom logic—e.g., key transformation or type coercion—on access.
